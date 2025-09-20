@@ -1,98 +1,103 @@
+import 'dart:convert';
 import 'dart:math';
 import 'package:dio/dio.dart';
-import '../../config/rest_client.dart';
+import 'package:flutter/services.dart' show rootBundle;
 
 class PatientsApi {
-  /// Lista de pacientes (si el backend no está disponible, usa fallback local)
+  static List<Map<String, dynamic>>? _cache;
+
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: 'https://randomuser.me',
+      connectTimeout: const Duration(seconds: 6),
+      receiveTimeout: const Duration(seconds: 10),
+    ),
+  );
+
   Future<List<Map<String, dynamic>>> list() async {
+    if (_cache != null) return _cache!;
     try {
-      final r = await rest.get('/patients');
-      return (r.data as List).cast<Map<String, dynamic>>();
+      final r = await _dio.get(
+        '/api/',
+        queryParameters: {'results': 20, 'nat': 'us,gb,es,mx,br,co'},
+      );
+      final results = (r.data['results'] as List).cast<Map<String, dynamic>>();
+      final rnd = Random();
+      int id = 1;
+      final mapped = results.map((u) {
+        final name = '${uc(u['name']['first'])} ${uc(u['name']['last'])}';
+        final doc = randomDigits(rnd, 10);
+        final gender =
+            (u['gender'] ?? '').toString().toLowerCase().startsWith('f')
+            ? 'F'
+            : 'M';
+        final phone = (u['cell'] ?? u['phone'] ?? '').toString();
+        final emerg = phone.replaceAll(RegExp(r'[^0-9]'), '') + '9';
+        final loc = u['location'];
+        final street = loc?['street'];
+        final addr =
+            '${street?['name'] ?? 'Calle'} ${street?['number'] ?? ''}, '
+            '${loc?['city'] ?? ''}, ${loc?['state'] ?? ''}';
+        final age = (u['dob']?['age'] ?? 30) as int;
+        final all = [
+          'I10',
+          'E11',
+          'J44',
+          'I25',
+          'C34',
+          'N18',
+          'Z88',
+          'F32',
+          'J45',
+          'E66',
+        ];
+        final k = rnd.nextInt(3);
+        final com = List.generate(k, (_) => all[rnd.nextInt(all.length)]);
+        return {
+          'id': id++,
+          'name': name,
+          'documentId': doc,
+          'age': age,
+          'sex': gender,
+          'phone': phone,
+          'emergencyContact': emerg,
+          'address': addr,
+          'comorbidities': com,
+          'nat': (u['nat'] ?? '').toString().toUpperCase(), // ej 'US','ES','CO'
+        };
+      }).toList();
+      _cache = mapped;
+      return _cache!;
     } catch (_) {
-      return _fallbackPatients();
+      // Fallback: asset local
+      final raw = await rootBundle.loadString('assets/patients.txt');
+      final data = jsonDecode(raw) as List;
+      _cache = data.map<Map<String, dynamic>>((e) {
+        final m = Map<String, dynamic>.from(e as Map);
+        m['nat'] ??= 'CO';
+        return m;
+      }).toList();
+      return _cache!;
     }
   }
 
-  /// Crear paciente
-  /// - Si el POST falla (no hay JSON Server), simula creación local y devuelve el mapa.
-  Future<Map<String, dynamic>> create(Map<String, dynamic> body) async {
-    try {
-      final r = await rest.post('/patients', data: body);
-      return r.data;
-    } on DioException catch (_) {
-      final map = Map<String, dynamic>.from(body);
-      map['id'] = DateTime.now().millisecondsSinceEpoch; // id temporal
-      return map;
-    }
-  }
-
-  /// Actualizar paciente
-  Future<void> update(int id, Map<String, dynamic> body) async {
-    await rest.patch('/patients/$id', data: body);
-  }
-
-  /// Eliminar paciente
-  Future<void> remove(int id) async {
-    await rest.delete('/patients/$id');
-  }
+  // Solo lectura (requisito: API pública)
+  Future<Map<String, dynamic>> create(Map<String, dynamic> _) async =>
+      throw UnsupportedError(
+        'Creación deshabilitada (solo lectura desde API pública)',
+      );
+  Future<void> update(int id, Map<String, dynamic> _) async =>
+      throw UnsupportedError(
+        'Edición deshabilitada (solo lectura desde API pública)',
+      );
+  Future<void> remove(int id) async => throw UnsupportedError(
+    'Eliminación deshabilitada (solo lectura desde API pública)',
+  );
 }
 
-/* ----------------- Fallback local (sin backend) ----------------- */
-
-String _randomDigits(Random rnd, int len) {
+/* helpers */
+String uc(String s) => s.isEmpty ? s : (s[0].toUpperCase() + s.substring(1));
+String randomDigits(Random rnd, int len) {
   const d = '0123456789';
   return List.generate(len, (_) => d[rnd.nextInt(10)]).join();
-}
-
-String _randomPhone(Random rnd) =>
-    '3${rnd.nextInt(10)}${rnd.nextInt(10)}${10000000 + rnd.nextInt(90000000)}';
-
-List<Map<String, dynamic>> _fallbackPatients() {
-  final rnd = Random(42);
-  const names = [
-    'Camila',
-    'Juan',
-    'María',
-    'Andrés',
-    'Valentina',
-    'Santiago',
-    'Daniela',
-    'Carlos',
-    'Laura',
-    'Felipe',
-    'Diana',
-    'Sebastián',
-  ];
-  const last = [
-    'García',
-    'Martínez',
-    'Rodríguez',
-    'López',
-    'González',
-    'Hernández',
-    'Pérez',
-    'Ramírez',
-    'Torres',
-    'Sánchez',
-    'Castro',
-    'Romero',
-  ];
-
-  return List.generate(10, (i) {
-    final name =
-        '${names[rnd.nextInt(names.length)]} ${names[rnd.nextInt(names.length)]} ${last[rnd.nextInt(last.length)]}';
-    return {
-      'id': i + 1,
-      'name': name,
-      // ✅ ahora es string de 10 dígitos; evita RangeError de nextInt grande
-      'documentId': _randomDigits(rnd, 10),
-      'age': 18 + rnd.nextInt(70),
-      'sex': rnd.nextBool() ? 'F' : 'M',
-      'phone': _randomPhone(rnd),
-      'emergencyContact': _randomPhone(rnd),
-      'address':
-          'Calle ${1 + rnd.nextInt(120)} # ${1 + rnd.nextInt(100)}-${1 + rnd.nextInt(50)}, Barrio Centro, Pasto',
-      'comorbidities': <String>[],
-    };
-  });
 }

@@ -4,16 +4,12 @@ class PatientTile extends StatelessWidget {
   final Map<String, dynamic> patient;
   final VoidCallback? onPresent;
   final VoidCallback? onAbsent;
-  final VoidCallback? onEdit;
-  final VoidCallback? onDelete;
 
   const PatientTile({
     super.key,
     required this.patient,
     this.onPresent,
     this.onAbsent,
-    this.onEdit,
-    this.onDelete,
   });
 
   @override
@@ -37,16 +33,6 @@ class PatientTile extends StatelessWidget {
               icon: const Icon(Icons.cancel_outlined),
               onPressed: onAbsent,
               tooltip: 'Ausente',
-            ),
-            IconButton(
-              icon: const Icon(Icons.edit_outlined),
-              onPressed: onEdit,
-              tooltip: 'Editar',
-            ),
-            IconButton(
-              icon: const Icon(Icons.delete_outline),
-              onPressed: onDelete,
-              tooltip: 'Eliminar',
             ),
           ],
         ),

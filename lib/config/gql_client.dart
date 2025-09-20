@@ -1,10 +1,10 @@
-// lib/config/gql_client.dart
-import 'package:flutter/foundation.dart'; // <- ESTE import faltaba
+import 'package:flutter/foundation.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 
+/// GraphQL público (Countries)
 const _gqlUrl = String.fromEnvironment(
   'GQL_URL',
-  defaultValue: 'http://10.0.2.2:4000/graphql',
+  defaultValue: 'https://countries.trevorblades.com/',
 );
 
 final ValueNotifier<GraphQLClient> gqlClient = ValueNotifier<GraphQLClient>(

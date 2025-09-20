@@ -11,8 +11,6 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-
-  # === Añadidos ===
   dio: ^5.7.0
   graphql_flutter: ^5.1.2
 
@@ -23,3 +21,5 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/patients.txt

@@ -1,7 +1,8 @@
+// lib/presentation/screens/risk_dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:graphql_flutter/graphql_flutter.dart';
 import '../../config/gql_client.dart';
-import '../../data/gql/queries.dart';
+import '../../data/gql/countries_queries.dart';
 import '../../data/rest/patients_api.dart';
 import '../../data/local/local_store.dart';
 
@@ -12,11 +13,13 @@ class RiskDashboardScreen extends StatefulWidget {
 }
 
 class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
-  int limit = 8;
-  List crit = [];
-  bool offline = false; // si GQL falla, pasamos a modo local
   final _patientsApi = PatientsApi();
   List<Map<String, dynamic>> _patients = [];
+  bool offline = false;
+  int limit = 8;
+
+  // 👇 TIPADO CORRECTO
+  List<Map<String, dynamic>> crit = [];
 
   @override
   void initState() {
@@ -31,11 +34,15 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_patients.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
     if (offline) {
       // ---------- MODO LOCAL ----------
       final dist = LocalStore.I.severityDistribution(_patients);
       final hist = LocalStore.I.conditionsHistogram(_patients);
-      final critical = LocalStore.I.criticalPatients(
+      final List<Map<String, dynamic>> critical = LocalStore.I.criticalPatients(
         _patients,
         limit: limit,
         offset: 0,
@@ -53,11 +60,12 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
             ),
             const SizedBox(height: 12),
             _CriticalListLocal(
-              patients: critical,
+              patients: crit.isEmpty ? critical : crit,
               onMore: () {
+                final start = (crit.isEmpty ? critical.length : crit.length);
                 final more = LocalStore.I.criticalPatients(
                   _patients,
-                  offset: crit.length,
+                  offset: start,
                   limit: limit,
                 );
                 setState(() {
@@ -75,7 +83,13 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
       );
     }
 
-    // ---------- INTENTAR GQL; si falla → offline = true ----------
+    // ------------ GQL público (Countries) ------------
+    final codes = _patients
+        .map((p) => (p['nat'] ?? '').toString().toUpperCase())
+        .where((c) => c.length == 2)
+        .toSet()
+        .toList();
+
     return GraphQLProvider(
       client: gqlClient,
       child: Padding(
@@ -84,7 +98,8 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
           children: [
             Query(
               options: QueryOptions(
-                document: gql(distQuery),
+                document: gql(countriesByCodesQuery),
+                variables: {'codes': codes},
                 fetchPolicy: FetchPolicy.networkOnly,
               ),
               builder: (result, {refetch, fetchMore}) {
@@ -92,18 +107,33 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
                   return const _TopStats(loading: true);
                 }
                 if (result.hasException) {
-                  // Cambia a modo local
                   WidgetsBinding.instance.addPostFrameCallback((_) {
                     setState(() => offline = true);
                   });
                   return const SizedBox.shrink();
                 }
-                final dist =
-                    result.data?['severityDistribution'] as List? ?? [];
-                final hist = result.data?['conditionsHistogram'] as List? ?? [];
+
+                final countries = (result.data?['countries'] as List? ?? []);
+                final Map<String, String> codeToContinent = {
+                  for (final c in countries)
+                    (c['code'] as String):
+                        (c['continent']?['name'] ?? 'Desconocido') as String,
+                };
+                final Map<String, int> byContinent = {};
+                for (final p in _patients) {
+                  final nat = (p['nat'] ?? '').toString().toUpperCase();
+                  final cont = codeToContinent[nat] ?? 'Desconocido';
+                  byContinent.update(cont, (v) => v + 1, ifAbsent: () => 1);
+                }
+                final distContinents = byContinent.entries
+                    .map((e) => {'level': e.key, 'count': e.value})
+                    .toList();
+
+                final hist = LocalStore.I.conditionsHistogram(_patients);
+
                 return _TopStats(
                   loading: false,
-                  dist: dist,
+                  dist: distContinents,
                   hist: hist,
                   onRefresh: () => refetch?.call(),
                 );
@@ -111,25 +141,13 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: Query(
-                options: QueryOptions(
-                  document: gql(criticalQuery),
-                  variables: {'limit': limit, 'offset': 0},
-                  fetchPolicy: FetchPolicy.networkOnly,
-                ),
-                builder: (res, {refetch, fetchMore}) {
-                  if (res.isLoading && (res.data == null)) {
-                    return const Center(child: CircularProgressIndicator());
-                  }
-                  if (res.hasException) {
-                    // Cambia a modo local
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      setState(() => offline = true);
-                    });
-                    return const SizedBox.shrink();
-                  }
-                  final first = (res.data?['criticalPatients'] as List?) ?? [];
-                  final data = crit.isEmpty ? first : crit;
+              child: Builder(
+                builder: (_) {
+                  final List<Map<String, dynamic>> initial = LocalStore.I
+                      .criticalPatients(_patients, limit: limit, offset: 0);
+                  final List<Map<String, dynamic>> data = crit.isEmpty
+                      ? initial
+                      : crit;
 
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -149,43 +167,18 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
                               OutlinedButton(
                                 onPressed: () {
                                   setState(() => crit.clear());
-                                  refetch?.call();
                                 },
                                 child: const Text('Refrescar'),
                               ),
                               const SizedBox(width: 8),
                               FilledButton(
-                                onPressed: () async {
-                                  final fm = fetchMore;
-                                  if (fm == null) return;
-                                  final r = await fm(
-                                    FetchMoreOptions(
-                                      variables: {
-                                        'limit': limit,
-                                        'offset': data.length,
-                                      },
-                                      updateQuery: (prevData, newData) {
-                                        final a = List.of(
-                                          (prevData?['criticalPatients']
-                                                  as List?) ??
-                                              [],
-                                        );
-                                        final b =
-                                            (newData?['criticalPatients']
-                                                as List?) ??
-                                            [];
-                                        return {
-                                          'criticalPatients': [...a, ...b],
-                                        };
-                                      },
-                                    ),
+                                onPressed: () {
+                                  final more = LocalStore.I.criticalPatients(
+                                    _patients,
+                                    offset: data.length,
+                                    limit: limit,
                                   );
-                                  setState(
-                                    () => crit =
-                                        (r.data?['criticalPatients']
-                                            as List?) ??
-                                        [],
-                                  );
+                                  setState(() => crit = [...data, ...more]);
                                 },
                                 child: const Text('Cargar más'),
                               ),
@@ -200,13 +193,13 @@ class _RiskDashboardScreenState extends State<RiskDashboardScreen> {
                           separatorBuilder: (_, __) => const Divider(height: 0),
                           itemBuilder: (_, i) {
                             final p = data[i];
-                            final sev = p['severity'];
-                            final level = sev?['level'] ?? '—';
-                            final score = sev?['score']?.toString() ?? '—';
+                            final s = LocalStore.I.severityFor(p);
                             return ListTile(
                               title: Text(p['name'] ?? ''),
-                              subtitle: Text('Nivel: $level'),
-                              trailing: Text('Score: $score'),
+                              subtitle: Text(
+                                'Nivel: ${s['level']}  •  País: ${(p['nat'] ?? '').toString().toUpperCase()}',
+                              ),
+                              trailing: Text('Score: ${s['score']}'),
                             );
                           },
                         ),
@@ -253,7 +246,7 @@ class _TopStats extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Severidad'),
+                const Text('Pacientes por continente (GraphQL)'),
                 const SizedBox(height: 6),
                 for (final b in dist ?? [])
                   Text('${b['level']}: ${b['count']}'),
@@ -269,7 +262,7 @@ class _TopStats extends StatelessWidget {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text('Condiciones'),
+                    const Text('Condiciones (local)'),
                     IconButton(
                       onPressed: onRefresh,
                       icon: const Icon(Icons.refresh),
@@ -299,7 +292,6 @@ class _Card extends StatelessWidget {
   }
 }
 
-// ---------- Lista crítica local ----------
 class _CriticalListLocal extends StatelessWidget {
   final List<Map<String, dynamic>> patients;
   final VoidCallback onMore;
@@ -309,7 +301,6 @@ class _CriticalListLocal extends StatelessWidget {
     required this.onMore,
     required this.onRefresh,
   });
-
   @override
   Widget build(BuildContext context) {
     return Expanded(
@@ -348,7 +339,9 @@ class _CriticalListLocal extends StatelessWidget {
                 final s = LocalStore.I.severityFor(p);
                 return ListTile(
                   title: Text(p['name'] ?? ''),
-                  subtitle: Text('Nivel: ${s['level']}'),
+                  subtitle: Text(
+                    'Nivel: ${s['level']}  •  País: ${(p['nat'] ?? '').toString().toUpperCase()}',
+                  ),
                   trailing: Text('Score: ${s['score']}'),
                 );
               },

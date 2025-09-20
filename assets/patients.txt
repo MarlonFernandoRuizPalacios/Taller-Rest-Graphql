@@ -1,0 +1,14 @@
+[
+  {"id":1,"name":"Camila Laura García","documentId":"1023456789","age":67,"sex":"F","phone":"3001234567","emergencyContact":"3119876543","address":"Calle 12 # 34-5, Barrio Centro, Pasto","comorbidities":["I10","E11"]},
+  {"id":2,"name":"Juan Andrés Martínez","documentId":"1034567890","age":45,"sex":"M","phone":"3011122334","emergencyContact":"3122211334","address":"Calle 45 # 10-22, San José, Pasto","comorbidities":[]},
+  {"id":3,"name":"María Valentina Rodríguez","documentId":"1045678901","age":72,"sex":"F","phone":"3024433221","emergencyContact":"3136677889","address":"Carrera 7 # 22-11, La Esperanza, Pasto","comorbidities":["I10"]},
+  {"id":4,"name":"Andrés Felipe López","documentId":"1056789012","age":59,"sex":"M","phone":"3009988776","emergencyContact":"3105566778","address":"Av. 1 # 45-33, San Martín, Pasto","comorbidities":["E66"]},
+  {"id":5,"name":"Valentina Daniela González","documentId":"1067890123","age":28,"sex":"F","phone":"3157788990","emergencyContact":"3201122334","address":"Calle 3 # 7-18, San Pedro, Pasto","comorbidities":[]},
+  {"id":6,"name":"Santiago Sebastián Hernández","documentId":"1078901234","age":81,"sex":"M","phone":"3163344556","emergencyContact":"3224455667","address":"Transv 9 # 66-21, Centro, Pasto","comorbidities":["I25","J44"]},
+  {"id":7,"name":"Daniela Camila Pérez","documentId":"1089012345","age":35,"sex":"F","phone":"3172233445","emergencyContact":"3001122998","address":"Calle 50 # 3-40, La Esperanza, Pasto","comorbidities":["F32"]},
+  {"id":8,"name":"Carlos Alberto Ramírez","documentId":"1090123456","age":63,"sex":"M","phone":"3184455667","emergencyContact":"3017788990","address":"Carrera 20 # 8-15, San José, Pasto","comorbidities":["E11","E66"]},
+  {"id":9,"name":"Laura Sofía Torres","documentId":"1101234567","age":52,"sex":"F","phone":"3195566778","emergencyContact":"3123344556","address":"Calle 18 # 70-12, Centro, Pasto","comorbidities":["J45"]},
+  {"id":10,"name":"Felipe David Sánchez","documentId":"1112345678","age":40,"sex":"M","phone":"3206677889","emergencyContact":"3131122334","address":"Av. 2 # 4-20, San Martín, Pasto","comorbidities":[]},
+  {"id":11,"name":"Diana Carolina Castro","documentId":"1123456789","age":76,"sex":"F","phone":"3217788990","emergencyContact":"3144433221","address":"Calle 60 # 12-33, San Pedro, Pasto","comorbidities":["N18","I10"]},
+  {"id":12,"name":"Sebastián Andrés Romero","documentId":"1134567890","age":69,"sex":"M","phone":"3228899001","emergencyContact":"3156677889","address":"Carrera 15 # 9-10, Centro, Pasto","comorbidities":["I25"]}
+]

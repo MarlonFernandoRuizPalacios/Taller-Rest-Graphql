@@ -56,13 +56,6 @@ class _HomeState extends State<_Home> {
           ),
         ],
       ),
-      floatingActionButton: _index == 0
-          ? FloatingActionButton.extended(
-              onPressed: () => PatientsScreen.of(context)?.createPatient(),
-              label: const Text('Nuevo paciente'),
-              icon: const Icon(Icons.add),
-            )
-          : null,
     );
   }
 }
